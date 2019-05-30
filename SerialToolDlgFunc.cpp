@@ -27,7 +27,7 @@ CSerialToolDlgFunc::~CSerialToolDlgFunc()
 {
 
 }
-void CSerialToolDlgFunc::CSerialToolDlgFuncQueryComm(CStringArray& strArrCom)
+void CSerialToolDlgFunc::QueryComm(CStringArray& strArrCom)
 {
 	HANDLE hCom;
 	CString strComName,strCom;
@@ -47,51 +47,72 @@ void CSerialToolDlgFunc::CSerialToolDlgFuncQueryComm(CStringArray& strArrCom)
 	}
 }
 
-int CSerialToolDlgFunc::CSerialToolDlgFuncConvertHex2CString(CString hexStr, CString dstStr)
+int CSerialToolDlgFunc::ConvertHex2CString(CString hexStr, CString dstStr)
 {
 	return -1;
 }
 
-static char ConvertHexChar(char ch)  
+char CSerialToolDlgFunc::ConvertHexChar(char ch)  
 {  
 	if((ch>='0')&&(ch<='9')) 
 		return ch-0x30;  
 	else if((ch>='A')&&(ch<='F')) 
 		return ch-'A'+10;  
 	else if((ch>='a')&&(ch<='f')) 
-		return ch-'a'+10; 
+		return ch-'a'+10;
 	else return (-1); 
 }
 
-int CSerialToolDlgFunc::CSerialToolDlgFuncConvertCString2Hex(CString srcStr, CString hexStr)
+int CSerialToolDlgFunc::ConvertCString2Hex(CString SrcStr,CByteArray &senddata)
 {
-	int hexdata,lowhexdata;
-	int hexdatalen = 0;
-//	int len = srcStr.GetLength();
-////	senddata.SetSize(len/2);
-//	for(int i = 0;i<len;)
-//	{
-//		char lstr;
-//		char hstr = str[i];
-//		if(hstr == ' ')
-//		{
-//			i++;
-//			continue;
-//		}
-//		i++;
-//		if(i>len)
-//			break;
-//		lstr = str[i];
-//		hexdata = ConvertHexChar(hstr);
-//		lowhexdata = ConvertHexChar(lstr);
-//		if((hexdata == 16)||(lowhexdata == 16))
-//			break;
-//		else
-//			hexdata = hexdata*16 + lowhexdata;
-//		i++;
-//		senddata[hexdatalen] = (char)hexdata;
-//		hexdatalen++;
-//	}
-//	senddata.SetSize(hexdatalen);
-	return hexdatalen;
+	int hexData,lowhexData;
+	int hexDataLen = 0;
+	int SrcStrLen = SrcStr.GetLength();
+	
+	if(1 == SrcStrLen%3)
+	{
+		if (' ' != SrcStr.GetAt(SrcStrLen-1))	//防止输入字符时的疏忽：最后一个字符不是空格
+		{
+			SrcStr.SetAt(SrcStrLen-1, ' ');
+		}
+		senddata.SetSize((SrcStrLen+1)/2);			
+	}
+	else
+	{
+		senddata.SetSize(SrcStrLen/2);			
+	}
+
+	for(int i = 0;i<SrcStrLen;)
+	{
+		if(i >= SrcStrLen)
+			break;
+		
+		char hstr = SrcStr[i++];
+		if(hstr == ' ')
+		{
+			continue;
+		}
+
+		if(i >= SrcStrLen)
+			break;
+		
+		char lstr = SrcStr[i++];
+		hexData = ConvertHexChar(hstr);
+		lowhexData = ConvertHexChar(lstr);
+		
+		if((hexData == -1)||(lowhexData == -1))
+			break;
+		else
+			hexData = hexData*16 + lowhexData;
+
+		senddata[hexDataLen++] = (char)hexData;
+	}
+	senddata.SetSize(hexDataLen);
+	return hexDataLen;
+}
+
+int CSerialToolDlgFunc::SendData(CStdioFile& file)
+{
+
+	return 0;
 }
