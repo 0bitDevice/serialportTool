@@ -20,10 +20,14 @@ class CSerialToolDlg : public CDialog
 // Construction
 public:
 	CSerialToolDlg(CWnd* pParent = NULL);	// standard constructor
-
+	BOOL PreTranslateMessage(MSG* pMsg);
 // Dialog Data
 	//{{AFX_DATA(CSerialToolDlg)
 	enum { IDD = IDD_SERIALTOOL_DIALOG };
+	CEdit	m_RecvEdit;
+	CButton	m_OpenCommBut;
+	CButton	m_OpensendfileBut;
+	CButton	m_SendBut;
 	CButton	m_HexRecvChkBut;
 	CButton	m_HexSendChkBut;
 	CEdit	m_SendEdit;
@@ -45,6 +49,9 @@ public:
 	BOOL	m_HexSendChk;
 	BOOL	m_HexRecvChk;
 	//}}AFX_DATA
+
+	CStdioFile	m_fileSend;
+	BOOL		m_bFileExist;
 
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CSerialToolDlg)
@@ -72,10 +79,12 @@ protected:
 	afx_msg void OnSelchangeComboBit();
 	afx_msg void OnDropdownComboPort();
 	afx_msg void OnButtonOpensendfile();
-	afx_msg BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnButtonSend();
 	afx_msg void OnCheckHexsend();
 	afx_msg void OnCheckHexrecv();
+	afx_msg void OnButtonClearrecv();
+	afx_msg void OnClose();
+	afx_msg void OnTimer(UINT nIDEvent);
 	DECLARE_EVENTSINK_MAP()
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()

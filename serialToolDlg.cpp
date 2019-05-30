@@ -77,6 +77,10 @@ void CSerialToolDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CSerialToolDlg)
+	DDX_Control(pDX, IDC_EDIT_RECV, m_RecvEdit);
+	DDX_Control(pDX, IDC_BUTTON_OPENCOM, m_OpenCommBut);
+	DDX_Control(pDX, IDC_BUTTON_OPENSENDFILE, m_OpensendfileBut);
+	DDX_Control(pDX, IDC_BUTTON_SEND, m_SendBut);
 	DDX_Control(pDX, IDC_CHECK_HEXRECV, m_HexRecvChkBut);
 	DDX_Control(pDX, IDC_CHECK_HEXSEND, m_HexSendChkBut);
 	DDX_Control(pDX, IDC_EDIT_SEND, m_SendEdit);
@@ -111,6 +115,9 @@ BEGIN_MESSAGE_MAP(CSerialToolDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_SEND, OnButtonSend)
 	ON_BN_CLICKED(IDC_CHECK_HEXSEND, OnCheckHexsend)
 	ON_BN_CLICKED(IDC_CHECK_HEXRECV, OnCheckHexrecv)
+	ON_BN_CLICKED(IDC_BUTTON_CLEARRECV, OnButtonClearrecv)
+	ON_WM_CLOSE()
+	ON_WM_TIMER()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
@@ -147,13 +154,12 @@ BOOL CSerialToolDlg::OnInitDialog()
 	// TODO: Add extra initialization here
 	
 	CStringArray strArrCom;
-	CSerialToolDlgFunc::CSerialToolDlgFuncQueryComm(strArrCom);
+	CSerialToolDlgFunc::QueryComm(strArrCom);
 	for (int i = 0; i < strArrCom.GetSize(); ++i)
 	{
 		m_PortNumCom.AddString(strArrCom.GetAt(i));
 	}
 	m_PortNumCom.SetCurSel(2);
-
 
 	m_BaudRateCom.AddString(_T("115200"));
 	m_BaudRateCom.AddString(_T("9600"));
@@ -181,6 +187,10 @@ BOOL CSerialToolDlg::OnInitDialog()
 	OnSelchangeComboParity();
 	OnSelchangeComboBit(); 
 	OnSelchangeComboStopbit();
+
+	m_SendBut.EnableWindow(FALSE);
+
+	SetTimer(1, 100, NULL);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -261,15 +271,23 @@ void CSerialToolDlg::OnCommMscomm()
 		for(long k=0; k<len; k++)						//将数组转换为Cstring型变量
 		{
 			BYTE bt=*(char*)(rxdata+k);			//字符型
-			strtemp.Format("%c",bt);			//将字符送入临时变量strtemp存放
-			m_RecvStr += strtemp;				//加入接收编辑框对应字符串
+			if (m_HexRecvChk)
+			{
+				strtemp.Format("%02x",bt);			//将字符送入临时变量strtemp存放	
+			}
+			else
+			{
+				strtemp.Format("%c",bt);			//将字符送入临时变量strtemp存放
+			}
+
+			int RecvStrLen = m_RecvEdit.GetWindowTextLength();
+			m_RecvEdit.SetSel(RecvStrLen, RecvStrLen);
+			m_RecvEdit.ReplaceSel(strtemp);
 		}
 	}
-
-	UpdateData(FALSE); //更新编辑框内容
 }
 
-void CSerialToolDlg::OnButtonOpencom() 
+void CSerialToolDlg::OnButtonOpencom()
 {
 	// TODO: Add your control notification handler code here
 	if(m_mscomm.GetPortOpen())					//如果串口是打开的，则行关闭串口
@@ -309,6 +327,18 @@ void CSerialToolDlg::OnButtonOpencom()
 		m_mscomm.SetInputMode(1);				//以二进制方式读写数据   0是字符, 1是二进制
 		m_mscomm.SetRThreshold(1);				//接收缓冲区有1个及1个以上字符时，将引发接收数据的  OnComm
 		m_mscomm.SetPortOpen(TRUE);
+
+		if (m_mscomm.GetPortOpen())
+		{
+			m_SendBut.EnableWindow(TRUE);
+		}
+		else
+		{
+			m_SendBut.EnableWindow(FALSE);
+			MessageBox("串口打开失败!!!");
+			return;
+		}
+
 		GetDlgItem( IDC_BUTTON_OPENCOM )->SetWindowText( _T("关闭串口") );
 	}
 }
@@ -326,7 +356,7 @@ void CSerialToolDlg::OnDropdownComboPort()
 	m_PortNumCom.ResetContent();
 
 	CStringArray strArrCom;
-	CSerialToolDlgFunc::CSerialToolDlgFuncQueryComm(strArrCom);
+	CSerialToolDlgFunc::QueryComm(strArrCom);
 	for (int i = 0; i < strArrCom.GetSize(); ++i)
 	{
 		m_PortNumCom.AddString(strArrCom.GetAt(i));
@@ -367,7 +397,20 @@ void CSerialToolDlg::OnSelchangeComboFlow()
 void CSerialToolDlg::OnButtonOpensendfile() 
 {
 	// TODO: Add your control notification handler code here
+    LPCTSTR szFilter = "文件 (*.txt)|*.txt|所有文件 (*.*)|*.*||";	
+	CFileDialog fd(TRUE,"*.txt", NULL, OFN_HIDEREADONLY, szFilter);	
+	if(IDCANCEL == fd.DoModal())
+		return;
 	
+	CString szFilte = fd.GetPathName();	
+	
+	m_bFileExist = m_fileSend.Open(szFilte, CFile::shareExclusive | CFile::modeRead);
+	if(!m_bFileExist)
+	{
+		AfxMessageBox("打开失败！");
+		return;
+	}
+
 }
 
 BOOL CSerialToolDlg::PreTranslateMessage(MSG* pMsg)
@@ -382,9 +425,18 @@ void CSerialToolDlg::OnButtonSend()
 {
 	// TODO: Add your control notification handler code here
 	UpdateData(TRUE);
-    m_mscomm.SetOutput(COleVariant(m_SendStr));
-    m_SendStr.Empty();
-    UpdateData(FALSE);
+	
+	BOOL bFLag = m_HexSendChkBut.GetCheck();
+	if(bFLag)
+	{
+		CByteArray hexdata;  
+		CSerialToolDlgFunc::ConvertCString2Hex(m_SendStr, hexdata);
+		m_mscomm.SetOutput(COleVariant(hexdata));
+	}
+	else
+	{
+		m_mscomm.SetOutput(COleVariant(m_SendStr));
+	}
 }
 
 void CSerialToolDlg::OnCheckHexsend() 
@@ -393,16 +445,17 @@ void CSerialToolDlg::OnCheckHexsend()
 	BOOL bFLag = m_HexSendChkBut.GetCheck();
 	if(bFLag)
 	{
-		if(IDCANCEL == MessageBox(_T("16进制发送以空格分隔字符eg：7F 89 2A"), NULL, MB_OKCANCEL))
+		if(IDCANCEL == MessageBox(_T("清除当前输入，以16进制发送数据以空格为分隔符\neg：7F 89 2A，非法输入将被截断！"), NULL, MB_OKCANCEL))
 		{
 			m_HexSendChkBut.SetCheck(BST_UNCHECKED);
 			return;
 		}
 	}
-	else
-	{
 
-	}
+	m_SendEdit.Clear();
+	UpdateData(FALSE);
+	m_HexSendChkBut.SetCheck(bFLag);
+	m_HexSendChk = bFLag;
 }
 
 void CSerialToolDlg::OnCheckHexrecv() 
@@ -410,15 +463,41 @@ void CSerialToolDlg::OnCheckHexrecv()
 	// TODO: Add your control notification handler code here
 	BOOL bFLag = m_HexRecvChkBut.GetCheck();
 	if(bFLag)
-	{
-		if(IDCANCEL == MessageBox(_T("十六进制显示会清除当前显示内容，是否执行！"), NULL, MB_OKCANCEL))
-		{
-			m_HexRecvChkBut.SetCheck(BST_UNCHECKED);
-			return;
-		}
-	}
-	else
-	{
+	{}
 
-	}
+	m_HexRecvChkBut.SetCheck(bFLag);
+	m_HexRecvChk = bFLag;
+}
+
+void CSerialToolDlg::OnButtonClearrecv() 
+{
+	// TODO: Add your control notification handler code here
+	m_RecvEdit.Clear();
+	m_RecvStr.Empty();
+	UpdateData(FALSE);
+}
+
+void CSerialToolDlg::OnClose() 
+{
+	// TODO: Add your message handler code here and/or call default
+	if(m_mscomm.GetPortOpen())		//如果串口是打开的，则行关闭串口
+    {
+        m_mscomm.SetPortOpen(FALSE);
+    }
+	CDialog::OnClose();
+}
+
+void CSerialToolDlg::OnTimer(UINT nIDEvent) 
+{
+	// TODO: Add your message handler code here and/or call default
+	switch(nIDEvent)
+	{
+        case 1:
+            break;
+        case 2:
+            break;
+        case 3:
+            break;
+    }
+	CDialog::OnTimer(nIDEvent);
 }
