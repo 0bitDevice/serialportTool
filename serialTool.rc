@@ -67,6 +67,8 @@ END
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 IDR_MAINFRAME           ICON    DISCARDABLE     "res\\serialTool.ico"
+IDI_ICON_TIMERSTART     ICON    DISCARDABLE     "res\\icon1.ico"
+IDI_ICON_TIMERFIN       ICON    DISCARDABLE     "res\\ico00001.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -124,7 +126,7 @@ BEGIN
     CONTROL         "HEX显示接收",IDC_CHECK_HEXRECV,"Button",BS_AUTOCHECKBOX | 
                     WS_TABSTOP,95,147,60,10
     PUSHBUTTON      "清空接收区",IDC_BUTTON_CLEARRECV,169,145,50,16
-    PUSHBUTTON      "定时",IDC_BUTTON_SETTIMER,69,147,22,17
+    PUSHBUTTON      "定时",IDC_BUTTON_SETTIMER,68,176,26,28,BS_ICON
 END
 
 

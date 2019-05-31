@@ -70,7 +70,6 @@ CSerialToolDlg::CSerialToolDlg(CWnd* pParent /*=NULL*/)
 	m_RecvStr = _T("");
 	m_HexSendChk = FALSE;
 	m_HexRecvChk = FALSE;
-	m_bFileExist = FALSE;
 	m_bOpenComm = FALSE;
 	m_bTimerStart = FALSE;
 	m_TimerThread = NULL;
@@ -83,6 +82,7 @@ void CSerialToolDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CSerialToolDlg)
+	DDX_Control(pDX, IDC_BUTTON_SETTIMER, m_SetTimerBut);
 	DDX_Control(pDX, IDC_EDIT_RECV, m_RecvEdit);
 	DDX_Control(pDX, IDC_BUTTON_OPENCOM, m_OpenCommBut);
 	DDX_Control(pDX, IDC_BUTTON_OPENSENDFILE, m_OpensendfileBut);
@@ -159,7 +159,8 @@ BOOL CSerialToolDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 	
 	// TODO: Add extra initialization here
-	
+	m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
+
 	CStringArray strArrCom;
 	CSerialToolDlgFunc::QueryComm(strArrCom);
 	for (int i = 0; i < strArrCom.GetSize(); ++i)
@@ -316,7 +317,7 @@ void CSerialToolDlg::OnButtonOpencom()
 	else
 	{
 		m_PortNum.Delete(0, 3);
-		m_mscomm.SetCommPort(atoi(m_PortNum));
+		m_mscomm.SetCommPort(_ttoi(m_PortNum));
 		CString strPara;
 		strPara=m_BaudRate;
 		strPara+=",";
@@ -410,20 +411,28 @@ void CSerialToolDlg::OnSelchangeComboFlow()
 void CSerialToolDlg::OnButtonOpensendfile() 
 {
 	// TODO: Add your control notification handler code here
-    LPCTSTR szFilter = "文件 (*.txt)|*.txt|所有文件 (*.*)|*.*||";	
-	CFileDialog fd(TRUE,"*.txt", NULL, OFN_HIDEREADONLY, szFilter);	
-	if(IDCANCEL == fd.DoModal())
-		return;
+    LPCTSTR szFilter = "文件 (*.txt)|*.txt|所有文件 (*.*)|*.*||";
+	CString strPathName;
 	
-	CString szFilte = fd.GetPathName();	
-	
-	m_bFileExist = m_fileSend.Open(szFilte, CFile::shareExclusive | CFile::modeRead);
-	if(!m_bFileExist)
-	{
-		AfxMessageBox("打开失败！");
-		return;
+	if (m_fileSend.m_pStream)
+	{	
+		m_fileSend.Close();
+		m_OpensendfileBut.SetWindowText("打开发送文件");
 	}
+	else
+	{
+		CFileDialog fd(TRUE,"*.txt", NULL, OFN_HIDEREADONLY, szFilter);	
+		if(IDCANCEL == fd.DoModal())
+			return;
+		strPathName = fd.GetPathName();
+		
+		if(!m_fileSend.Open(strPathName, CFile::shareExclusive | CFile::modeRead))
+		{
+			AfxMessageBox("打开失败！");
+		}
 
+		m_OpensendfileBut.SetWindowText("关闭发送文件");
+	}
 }
 
 BOOL CSerialToolDlg::PreTranslateMessage(MSG* pMsg)
@@ -465,8 +474,6 @@ void CSerialToolDlg::OnCheckHexsend()
 		}
 	}
 
-	m_SendEdit.Clear();
-	UpdateData(FALSE);
 	m_HexSendChkBut.SetCheck(bFLag);
 	m_HexSendChk = bFLag;
 }
@@ -497,7 +504,7 @@ void CSerialToolDlg::OnClose()
     {
         m_mscomm.SetPortOpen(FALSE);
     }
-	if (m_bFileExist)				//若发送文件打开，则关闭
+	if (m_fileSend.m_pStream)				//若发送文件打开，则关闭
 	{
 		m_fileSend.Close();
 	}
@@ -511,12 +518,6 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 	switch(nIDEvent)
 	{
         case 1:
-//			if (m_bFileExist && m_bOpenComm)
-//			{
-//				CString strData;
-//				CSerialToolDlgFunc::ProcessingData(m_fileSend, strData);
-//				m_mscomm.SetOutput(COleVariant(strData));
-//			}
             break;
         case 2:
             break;
@@ -532,9 +533,11 @@ void CSerialToolDlg::OnButtonSettimer()
 	m_bTimerStart = !m_bTimerStart;
 	if (m_bTimerStart)
 	{
-		if (m_bFileExist && m_bOpenComm)
+		if (m_fileSend.m_pStream && m_bOpenComm)
 		{
 			m_TimerThread = AfxBeginThread((AFX_THREADPROC)timerThreadProc, this, THREAD_PRIORITY_HIGHEST);
+
+			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERFIN));
 		}
 	}
 	else
@@ -543,6 +546,8 @@ void CSerialToolDlg::OnButtonSettimer()
 		{
 			WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
 			m_TimerThread = NULL;
+
+			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
 		}
 	}
 }

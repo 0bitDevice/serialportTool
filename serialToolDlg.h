@@ -2,9 +2,10 @@
 //
 //{{AFX_INCLUDES()
 #include "mscomm.h"
-#include <afxmt.h>
 
 //}}AFX_INCLUDES
+
+#include <afxmt.h>
 
 #if !defined(AFX_SERIALTOOLDLG_H__DF70D52F_48A3_417D_BBCA_BDFD6858B126__INCLUDED_)
 #define AFX_SERIALTOOLDLG_H__DF70D52F_48A3_417D_BBCA_BDFD6858B126__INCLUDED_
@@ -25,6 +26,7 @@ public:
 // Dialog Data
 	//{{AFX_DATA(CSerialToolDlg)
 	enum { IDD = IDD_SERIALTOOL_DIALOG };
+	CButton	m_SetTimerBut;
 	CEdit	m_RecvEdit;
 	CButton	m_OpenCommBut;
 	CButton	m_OpensendfileBut;
@@ -52,7 +54,6 @@ public:
 	//}}AFX_DATA
 
 	CStdioFile	m_fileSend;
-	BOOL		m_bFileExist;
 	BOOL		m_bOpenComm;
 	BOOL		m_bTimerStart;
 	CEvent		m_ThreadStopEvnt;

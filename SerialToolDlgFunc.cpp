@@ -114,13 +114,55 @@ int CSerialToolDlgFunc::ConvertCString2Hex(CString SrcStr,CByteArray &senddata)
 int CSerialToolDlgFunc::ProcessingData(CStdioFile& file, CString& strData)
 {
 	CString strLine;
-	while(file.ReadString(strLine))
+	int phraseCount = 0;
+	if(file.ReadString(strLine))
 	{
-		strLine.TrimRight();
+		if(strLine.Left(6).Compare("$GNGGA") == 0)
+			strData += strLine + "\r\n";
 
+		if(file.ReadString(strLine))
+		{
+			if (strLine.Left(6).Compare("$GNGSA") == 0)
+			{
+				strData += strLine + "\r\n";
+				++phraseCount;
+			}
+		}
 
-		strData = strLine;
-		return 1;
+		if(file.ReadString(strLine))
+		{
+			if (strLine.Left(6).Compare("$GNGSA") == 0)
+			{
+				strData += strLine + "\r\n";
+				++phraseCount;
+			}
+		}
+
+		if(file.ReadString(strLine))
+		{
+			if (strLine.Left(6).Compare("$GNRMC") == 0)
+			{
+				strData += strLine + "\r\n";
+				++phraseCount;
+			}
+		}
+		if(file.ReadString(strLine))
+		{
+			if (strLine.Left(6).Compare("$GNVTG") == 0)
+			{
+				strData += strLine + "\r\n";
+				++phraseCount;
+			}
+		}
+		if(file.ReadString(strLine))
+		{
+			if (strLine.Left(6).Compare("$GNDHV") == 0)
+			{
+				strData += strLine + "\r\n";
+				++phraseCount;
+			}
+		}
 	}
-	return 0;
+
+	return phraseCount;
 }
