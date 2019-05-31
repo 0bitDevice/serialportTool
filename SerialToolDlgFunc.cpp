@@ -111,8 +111,16 @@ int CSerialToolDlgFunc::ConvertCString2Hex(CString SrcStr,CByteArray &senddata)
 	return hexDataLen;
 }
 
-int CSerialToolDlgFunc::SendData(CStdioFile& file)
+int CSerialToolDlgFunc::ProcessingData(CStdioFile& file, CString& strData)
 {
+	CString strLine;
+	while(file.ReadString(strLine))
+	{
+		strLine.TrimRight();
 
+
+		strData = strLine;
+		return 1;
+	}
 	return 0;
 }

@@ -5,6 +5,7 @@
 #include "serialTool.h"
 #include "serialToolDlg.h"
 #include "SerialToolDlgFunc.h"
+#include <math.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -12,6 +13,7 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
+#define EPSILON			0.000001
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
 
@@ -68,6 +70,10 @@ CSerialToolDlg::CSerialToolDlg(CWnd* pParent /*=NULL*/)
 	m_RecvStr = _T("");
 	m_HexSendChk = FALSE;
 	m_HexRecvChk = FALSE;
+	m_bFileExist = FALSE;
+	m_bOpenComm = FALSE;
+	m_bTimerStart = FALSE;
+	m_TimerThread = NULL;
 	//}}AFX_DATA_INIT
 	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -118,6 +124,7 @@ BEGIN_MESSAGE_MAP(CSerialToolDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_CLEARRECV, OnButtonClearrecv)
 	ON_WM_CLOSE()
 	ON_WM_TIMER()
+	ON_BN_CLICKED(IDC_BUTTON_SETTIMER, OnButtonSettimer)
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
@@ -189,8 +196,9 @@ BOOL CSerialToolDlg::OnInitDialog()
 	OnSelchangeComboStopbit();
 
 	m_SendBut.EnableWindow(FALSE);
+	m_OpensendfileBut.EnableWindow(FALSE);
 
-	SetTimer(1, 100, NULL);
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -266,18 +274,18 @@ void CSerialToolDlg::OnCommMscomm()
 
 		for(long i=0; i<len; i++)
 		{
-			safearray_inp.GetElement(&i,rxdata+i);		//转换为BYTE型数组
+			safearray_inp.GetElement(&i,rxdata+i);	//转换为BYTE型数组
 		}
-		for(long k=0; k<len; k++)						//将数组转换为Cstring型变量
+		for(long k=0; k<len; k++)
 		{
-			BYTE bt=*(char*)(rxdata+k);			//字符型
+			BYTE bt=*(char*)(rxdata+k);
 			if (m_HexRecvChk)
 			{
-				strtemp.Format("%02x",bt);			//将字符送入临时变量strtemp存放	
+				strtemp.Format("%02x",bt);
 			}
 			else
 			{
-				strtemp.Format("%c",bt);			//将字符送入临时变量strtemp存放
+				strtemp.Format("%c",bt);
 			}
 
 			int RecvStrLen = m_RecvEdit.GetWindowTextLength();
@@ -297,18 +305,16 @@ void CSerialToolDlg::OnButtonOpencom()
 		((CComboBox *)GetDlgItem(IDC_COMBO_PARITY))->EnableWindow(TRUE);
 		((CComboBox *)GetDlgItem(IDC_COMBO_BIT))->EnableWindow(TRUE);
 		((CComboBox *)GetDlgItem(IDC_COMBO_STOPBIT))->EnableWindow(TRUE);
+		
+		m_OpensendfileBut.EnableWindow(FALSE);
+		m_SendBut.EnableWindow(FALSE);
 
         m_mscomm.SetPortOpen(FALSE);
-		GetDlgItem( IDC_BUTTON_OPENCOM )->SetWindowText( _T("打开串口") );
+		m_OpenCommBut.SetWindowText( _T("打开串口") );
+		m_bOpenComm = FALSE;
     }
 	else
 	{
-		((CComboBox *)GetDlgItem(IDC_COMBO_PORT))->EnableWindow(FALSE);			//关闭设置参数combox
-		((CComboBox *)GetDlgItem(IDC_COMBO_BAUD))->EnableWindow(FALSE);
-		((CComboBox *)GetDlgItem(IDC_COMBO_PARITY))->EnableWindow(FALSE);
-		((CComboBox *)GetDlgItem(IDC_COMBO_BIT))->EnableWindow(FALSE);
-		((CComboBox *)GetDlgItem(IDC_COMBO_STOPBIT))->EnableWindow(FALSE);
-
 		m_PortNum.Delete(0, 3);
 		m_mscomm.SetCommPort(atoi(m_PortNum));
 		CString strPara;
@@ -330,16 +336,23 @@ void CSerialToolDlg::OnButtonOpencom()
 
 		if (m_mscomm.GetPortOpen())
 		{
+			((CComboBox *)GetDlgItem(IDC_COMBO_PORT))->EnableWindow(FALSE);			//关闭设置参数combox
+			((CComboBox *)GetDlgItem(IDC_COMBO_BAUD))->EnableWindow(FALSE);
+			((CComboBox *)GetDlgItem(IDC_COMBO_PARITY))->EnableWindow(FALSE);
+			((CComboBox *)GetDlgItem(IDC_COMBO_BIT))->EnableWindow(FALSE);
+			((CComboBox *)GetDlgItem(IDC_COMBO_STOPBIT))->EnableWindow(FALSE);
+
+			m_OpensendfileBut.EnableWindow(TRUE);
 			m_SendBut.EnableWindow(TRUE);
+
+			m_OpenCommBut.SetWindowText( _T("关闭串口") );
+			m_bOpenComm = TRUE;
 		}
 		else
 		{
-			m_SendBut.EnableWindow(FALSE);
 			MessageBox("串口打开失败!!!");
 			return;
 		}
-
-		GetDlgItem( IDC_BUTTON_OPENCOM )->SetWindowText( _T("关闭串口") );
 	}
 }
 
@@ -484,6 +497,11 @@ void CSerialToolDlg::OnClose()
     {
         m_mscomm.SetPortOpen(FALSE);
     }
+	if (m_bFileExist)				//若发送文件打开，则关闭
+	{
+		m_fileSend.Close();
+	}
+
 	CDialog::OnClose();
 }
 
@@ -493,6 +511,12 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 	switch(nIDEvent)
 	{
         case 1:
+//			if (m_bFileExist && m_bOpenComm)
+//			{
+//				CString strData;
+//				CSerialToolDlgFunc::ProcessingData(m_fileSend, strData);
+//				m_mscomm.SetOutput(COleVariant(strData));
+//			}
             break;
         case 2:
             break;
@@ -500,4 +524,55 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
             break;
     }
 	CDialog::OnTimer(nIDEvent);
+}
+
+void CSerialToolDlg::OnButtonSettimer() 
+{
+	// TODO: Add your control notification handler code here
+	m_bTimerStart = !m_bTimerStart;
+	if (m_bTimerStart)
+	{
+		if (m_bFileExist && m_bOpenComm)
+		{
+			m_TimerThread = AfxBeginThread((AFX_THREADPROC)timerThreadProc, this, THREAD_PRIORITY_HIGHEST);
+		}
+	}
+	else
+	{
+		if (m_TimerThread != NULL)
+		{
+			WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
+			m_TimerThread = NULL;
+		}
+	}
+}
+
+DWORD WINAPI CSerialToolDlg::timerThreadProc(LPVOID pParam)
+{
+	CSerialToolDlg* pSerialToolDlg = (CSerialToolDlg*)pParam;
+	SetThreadAffinityMask(GetCurrentThread(), 1);  
+		
+	while (pSerialToolDlg->m_bTimerStart)
+	{
+		CString strData;
+		CSerialToolDlgFunc::ProcessingData(pSerialToolDlg->m_fileSend, strData);
+		pSerialToolDlg->m_mscomm.SetOutput(COleVariant(strData));
+
+		LARGE_INTEGER start, end;
+		LARGE_INTEGER freq;
+		double passedTime = .0;
+		QueryPerformanceFrequency(&freq);  
+		QueryPerformanceCounter(&start);//start  
+		//running 100 milliseconds
+		while ((pSerialToolDlg->m_bTimerStart) && ((passedTime < 100) && (fabs(passedTime - 100.0) >= EPSILON)))
+		{
+			QueryPerformanceCounter(&end); //end
+
+			passedTime = 1000 * (end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
+		}
+	}
+
+	pSerialToolDlg->m_ThreadStopEvnt.SetEvent();
+
+	return 0;
 }

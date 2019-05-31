@@ -2,6 +2,7 @@
 //
 //{{AFX_INCLUDES()
 #include "mscomm.h"
+#include <afxmt.h>
 
 //}}AFX_INCLUDES
 
@@ -52,7 +53,11 @@ public:
 
 	CStdioFile	m_fileSend;
 	BOOL		m_bFileExist;
-
+	BOOL		m_bOpenComm;
+	BOOL		m_bTimerStart;
+	CEvent		m_ThreadStopEvnt;
+	CWinThread*	m_TimerThread;
+	static DWORD WINAPI timerThreadProc(LPVOID pParam);
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CSerialToolDlg)
 	protected:
@@ -85,6 +90,7 @@ protected:
 	afx_msg void OnButtonClearrecv();
 	afx_msg void OnClose();
 	afx_msg void OnTimer(UINT nIDEvent);
+	afx_msg void OnButtonSettimer();
 	DECLARE_EVENTSINK_MAP()
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
