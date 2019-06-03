@@ -26,6 +26,7 @@ public:
 // Dialog Data
 	//{{AFX_DATA(CSerialToolDlg)
 	enum { IDD = IDD_SERIALTOOL_DIALOG };
+	CButton	m_RecvSaveBut;
 	CButton	m_SetTimerBut;
 	CEdit	m_RecvEdit;
 	CButton	m_OpenCommBut;
@@ -54,10 +55,13 @@ public:
 	//}}AFX_DATA
 
 	CStdioFile	m_fileSend;
+	CStdioFile	m_fileRecv;
+	BOOL		m_bRecordRecv;
 	BOOL		m_bOpenComm;
 	BOOL		m_bTimerStart;
 	CEvent		m_ThreadStopEvnt;
 	CWinThread*	m_TimerThread;
+	LONG		m_TimerCount;
 	static DWORD WINAPI timerThreadProc(LPVOID pParam);
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CSerialToolDlg)
@@ -92,6 +96,7 @@ protected:
 	afx_msg void OnClose();
 	afx_msg void OnTimer(UINT nIDEvent);
 	afx_msg void OnButtonSettimer();
+	afx_msg void OnButtonRecvsave();
 	DECLARE_EVENTSINK_MAP()
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()

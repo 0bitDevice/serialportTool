@@ -20,6 +20,7 @@ public:
 	static char ConvertHexChar(char ch);
 	static int ConvertCString2Hex(CString str, CByteArray& senddata);
 	static int ProcessingData(CStdioFile& file, CString& strData);
+	static int RecordData(CStdioFile& file, CString& strData);
 };
 
 #endif // !defined(AFX_SERIALTOOLDLGFUNC_H__CB10B155_F5E3_434B_92AF_5D05DEE57507__INCLUDED_)

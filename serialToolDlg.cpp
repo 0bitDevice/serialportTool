@@ -73,6 +73,7 @@ CSerialToolDlg::CSerialToolDlg(CWnd* pParent /*=NULL*/)
 	m_bOpenComm = FALSE;
 	m_bTimerStart = FALSE;
 	m_TimerThread = NULL;
+	m_bRecordRecv = FALSE;
 	//}}AFX_DATA_INIT
 	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -82,6 +83,7 @@ void CSerialToolDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CSerialToolDlg)
+	DDX_Control(pDX, IDC_BUTTON_RECVSAVE, m_RecvSaveBut);
 	DDX_Control(pDX, IDC_BUTTON_SETTIMER, m_SetTimerBut);
 	DDX_Control(pDX, IDC_EDIT_RECV, m_RecvEdit);
 	DDX_Control(pDX, IDC_BUTTON_OPENCOM, m_OpenCommBut);
@@ -125,6 +127,7 @@ BEGIN_MESSAGE_MAP(CSerialToolDlg, CDialog)
 	ON_WM_CLOSE()
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BUTTON_SETTIMER, OnButtonSettimer)
+	ON_BN_CLICKED(IDC_BUTTON_RECVSAVE, OnButtonRecvsave)
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
@@ -265,7 +268,7 @@ void CSerialToolDlg::OnCommMscomm()
 	COleSafeArray safearray_inp;
 	LONG len;
 	BYTE rxdata[2048];								//设置BYTE数组 An 8-bit integerthat is not signed.
-	CString strtemp;
+	CString strtemp, strPack;
 
 	if(m_mscomm.GetCommEvent()==2)					//事件值为2表示接收缓冲区内有字符
 	{
@@ -277,6 +280,9 @@ void CSerialToolDlg::OnCommMscomm()
 		{
 			safearray_inp.GetElement(&i,rxdata+i);	//转换为BYTE型数组
 		}
+
+		strPack.Empty();
+
 		for(long k=0; k<len; k++)
 		{
 			BYTE bt=*(char*)(rxdata+k);
@@ -289,9 +295,16 @@ void CSerialToolDlg::OnCommMscomm()
 				strtemp.Format("%c",bt);
 			}
 
-			int RecvStrLen = m_RecvEdit.GetWindowTextLength();
+			strPack += strtemp;
+
+			int RecvStrLen = m_RecvEdit.GetWindowTextLength();		
 			m_RecvEdit.SetSel(RecvStrLen, RecvStrLen);
 			m_RecvEdit.ReplaceSel(strtemp);
+		}
+
+		if (m_bRecordRecv)
+		{
+			CSerialToolDlgFunc::RecordData(m_fileRecv, strPack);
 		}
 	}
 }
@@ -467,7 +480,7 @@ void CSerialToolDlg::OnCheckHexsend()
 	BOOL bFLag = m_HexSendChkBut.GetCheck();
 	if(bFLag)
 	{
-		if(IDCANCEL == MessageBox(_T("清除当前输入，以16进制发送数据以空格为分隔符\neg：7F 89 2A，非法输入将被截断！"), NULL, MB_OKCANCEL))
+		if(IDCANCEL == MessageBox(_T("16进制发送数据以空格为分隔符\neg：7F 89 2A，非法输入将被忽略！"), NULL, MB_OKCANCEL))
 		{
 			m_HexSendChkBut.SetCheck(BST_UNCHECKED);
 			return;
@@ -507,6 +520,10 @@ void CSerialToolDlg::OnClose()
 	if (m_fileSend.m_pStream)				//若发送文件打开，则关闭
 	{
 		m_fileSend.Close();
+	}
+	if (m_fileRecv.m_pStream)
+	{
+		m_fileRecv.Close();
 	}
 
 	CDialog::OnClose();
@@ -565,7 +582,7 @@ DWORD WINAPI CSerialToolDlg::timerThreadProc(LPVOID pParam)
 
 		LARGE_INTEGER start, end;
 		LARGE_INTEGER freq;
-		double passedTime = .0;
+		double passedTime = 0.0;
 		QueryPerformanceFrequency(&freq);  
 		QueryPerformanceCounter(&start);//start  
 		//running 100 milliseconds
@@ -580,4 +597,37 @@ DWORD WINAPI CSerialToolDlg::timerThreadProc(LPVOID pParam)
 	pSerialToolDlg->m_ThreadStopEvnt.SetEvent();
 
 	return 0;
+}
+
+void CSerialToolDlg::OnButtonRecvsave() 
+{
+	// TODO: Add your control notification handler code here
+	LPCTSTR szFilter = "文件 (*.txt)|*.txt|所有文件 (*.*)|*.*||";
+	CString strPathName;
+	CFileDialog fd(FALSE,"*.txt", NULL, OFN_HIDEREADONLY, szFilter);	
+
+	if (m_fileRecv.m_pStream)
+	{
+		m_fileRecv.Close();
+		m_bRecordRecv = FALSE;
+		m_RecvSaveBut.SetWindowText("记录接收区");
+	}
+	else
+	{
+		if(IDCANCEL == fd.DoModal())
+			return;
+		strPathName = fd.GetPathName();
+		
+		if(!m_fileRecv.Open(strPathName, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary))
+		{
+			AfxMessageBox("保存失败！");
+			m_bRecordRecv = FALSE;
+			m_RecvSaveBut.SetWindowText("记录接收区");
+		}
+		else
+		{
+			m_bRecordRecv = TRUE;
+			m_RecvSaveBut.SetWindowText("记录中……");
+		}
+	}
 }

@@ -115,54 +115,99 @@ int CSerialToolDlgFunc::ProcessingData(CStdioFile& file, CString& strData)
 {
 	CString strLine;
 	int phraseCount = 0;
+	LONG lActual;
+	lActual = file.GetPosition();
 	if(file.ReadString(strLine))
 	{
 		if(strLine.Left(6).Compare("$GNGGA") == 0)
+		{
 			strData += strLine + "\r\n";
-
-		if(file.ReadString(strLine))
-		{
-			if (strLine.Left(6).Compare("$GNGSA") == 0)
-			{
-				strData += strLine + "\r\n";
-				++phraseCount;
-			}
+			++phraseCount;
 		}
-
-		if(file.ReadString(strLine))
+		else
 		{
-			if (strLine.Left(6).Compare("$GNGSA") == 0)
-			{
-				strData += strLine + "\r\n";
-				++phraseCount;
-			}
-		}
-
-		if(file.ReadString(strLine))
-		{
-			if (strLine.Left(6).Compare("$GNRMC") == 0)
-			{
-				strData += strLine + "\r\n";
-				++phraseCount;
-			}
-		}
-		if(file.ReadString(strLine))
-		{
-			if (strLine.Left(6).Compare("$GNVTG") == 0)
-			{
-				strData += strLine + "\r\n";
-				++phraseCount;
-			}
-		}
-		if(file.ReadString(strLine))
-		{
-			if (strLine.Left(6).Compare("$GNDHV") == 0)
-			{
-				strData += strLine + "\r\n";
-				++phraseCount;
-			}
+			file.Seek(lActual, CFile::begin);
 		}
 	}
+	lActual = file.GetPosition();
+	if(file.ReadString(strLine))
+	{
+		if (strLine.Left(6).Compare("$GNGSA") == 0)
+		{
+			strData += strLine + "\r\n";
+			++phraseCount;
+		}
+		else
+		{
+			file.Seek(lActual, CFile::begin);
+		}
+	}
+	lActual = file.GetPosition();
+	if(file.ReadString(strLine))
+	{
+		if (strLine.Left(6).Compare("$GNGSA") == 0)
+		{
+			strData += strLine + "\r\n";
+			++phraseCount;
+		}
+		else
+		{
+			file.Seek(lActual, CFile::begin);
+		}
+	}
+	lActual = file.GetPosition();
+	if(file.ReadString(strLine))
+	{
+		if (strLine.Left(6).Compare("$GNRMC") == 0)
+		{
+			strData += strLine + "\r\n";
+			++phraseCount;
+		}
+		else
+		{
+			file.Seek(lActual, CFile::begin);
+		}
+	}
+	lActual = file.GetPosition();
+	if(file.ReadString(strLine))
+	{
+		if (strLine.Left(6).Compare("$GNVTG") == 0)
+		{
+			strData += strLine + "\r\n";
+			++phraseCount;
+		}
+		else
+		{
+			file.Seek(lActual, CFile::begin);
+		}
+	}
+	lActual = file.GetPosition();
+	if(file.ReadString(strLine))
+	{
+		if (strLine.Left(6).Compare("$GNDHV") == 0)
+		{
+			strData += strLine + "\r\n";
+			++phraseCount;
+		}
+		else
+		{
+			file.Seek(lActual, CFile::begin);
+		}
+	}
+	
 
 	return phraseCount;
+}
+
+int CSerialToolDlgFunc::RecordData(CStdioFile& file, CString& strData)
+{
+	SYSTEMTIME sysTime;
+	GetLocalTime(&sysTime);
+	CString strTime, strDataTimed;
+	strTime.Format("[%d:%d:%d.%d]", sysTime.wHour, sysTime.wMinute, sysTime.wSecond, sysTime.wMilliseconds);
+
+	strDataTimed = strTime + strData;
+	file.Write(strDataTimed, strDataTimed.GetLength());
+
+	return 0;
 }
