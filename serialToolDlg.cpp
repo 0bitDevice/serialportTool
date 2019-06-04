@@ -303,10 +303,6 @@ void CSerialToolDlg::OnCommMscomm()
 			strPack += strtemp;
 
 			m_RecvStrBuff += strtemp;
-
-//			int RecvStrLen = m_RecvEdit.GetWindowTextLength();		
-//			m_RecvEdit.SetSel(RecvStrLen, RecvStrLen, TRUE);
-//			m_RecvEdit.ReplaceSel(strtemp);
 		}
 
 		if (m_bRecordRecv)
@@ -335,6 +331,30 @@ void CSerialToolDlg::OnButtonOpencom()
         m_mscomm.SetPortOpen(FALSE);
 		m_OpenCommBut.SetWindowText( _T("打开串口") );
 		m_bOpenComm = FALSE;
+		m_bTimerStart = FALSE;
+
+		if (m_TimerThread != NULL)
+		{
+			WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
+			m_TimerThread = NULL;
+
+			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
+			KillTimer(1);
+		}
+
+		m_ProgressSendFile.SetPos(0);
+		if (m_fileSend.m_pStream)
+		{	
+			m_fileSend.Close();
+			m_OpensendfileBut.SetWindowText("打开发送文件");
+		}
+
+		if (m_fileRecv.m_pStream)
+		{
+			m_fileRecv.Close();
+			m_bRecordRecv = FALSE;
+			m_RecvSaveBut.SetWindowText("记录接收区");
+		}
     }
 	else
 	{
