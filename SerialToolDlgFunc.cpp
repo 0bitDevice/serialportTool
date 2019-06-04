@@ -116,6 +116,12 @@ int CSerialToolDlgFunc::ProcessingData(CStdioFile& file, CString& strData)
 	CString strLine;
 	int phraseCount = 0;
 	LONG lActual;
+
+	if (!file.m_pStream)
+	{
+		return -1;
+	}
+
 	lActual = file.GetPosition();
 	if(file.ReadString(strLine))
 	{

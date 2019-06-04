@@ -13,7 +13,8 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-#define EPSILON			0.000001
+#define EPSILON					0.000001
+#define FSPROGRESSMAXRANGE		100
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
 
@@ -83,6 +84,7 @@ void CSerialToolDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CSerialToolDlg)
+	DDX_Control(pDX, IDC_PROGRESS_SENDFILE, m_ProgressSendFile);
 	DDX_Control(pDX, IDC_BUTTON_RECVSAVE, m_RecvSaveBut);
 	DDX_Control(pDX, IDC_BUTTON_SETTIMER, m_SetTimerBut);
 	DDX_Control(pDX, IDC_EDIT_RECV, m_RecvEdit);
@@ -163,6 +165,9 @@ BOOL CSerialToolDlg::OnInitDialog()
 	
 	// TODO: Add extra initialization here
 	m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
+	m_ProgressSendFile.SetRange(0, FSPROGRESSMAXRANGE);
+
+	m_RecvEdit.SetLimitText(UINT_MAX);
 
 	CStringArray strArrCom;
 	CSerialToolDlgFunc::QueryComm(strArrCom);
@@ -297,15 +302,18 @@ void CSerialToolDlg::OnCommMscomm()
 
 			strPack += strtemp;
 
-			int RecvStrLen = m_RecvEdit.GetWindowTextLength();		
-			m_RecvEdit.SetSel(RecvStrLen, RecvStrLen);
-			m_RecvEdit.ReplaceSel(strtemp);
+			m_RecvStrBuff += strtemp;
+
+//			int RecvStrLen = m_RecvEdit.GetWindowTextLength();		
+//			m_RecvEdit.SetSel(RecvStrLen, RecvStrLen, TRUE);
+//			m_RecvEdit.ReplaceSel(strtemp);
 		}
 
 		if (m_bRecordRecv)
 		{
 			CSerialToolDlgFunc::RecordData(m_fileRecv, strPack);
 		}
+		
 	}
 }
 
@@ -314,6 +322,7 @@ void CSerialToolDlg::OnButtonOpencom()
 	// TODO: Add your control notification handler code here
 	if(m_mscomm.GetPortOpen())					//如果串口是打开的，则行关闭串口
     {
+		KillTimer(2);				//关闭接收区显示刷新的定时器
 		((CComboBox *)GetDlgItem(IDC_COMBO_PORT))->EnableWindow(TRUE);			//打开设置参数combox
 		((CComboBox *)GetDlgItem(IDC_COMBO_BAUD))->EnableWindow(TRUE);
 		((CComboBox *)GetDlgItem(IDC_COMBO_PARITY))->EnableWindow(TRUE);
@@ -329,6 +338,7 @@ void CSerialToolDlg::OnButtonOpencom()
     }
 	else
 	{
+		SetTimer(2, 200, NULL);		//打开接收区显示刷新的定时器
 		m_PortNum.Delete(0, 3);
 		m_mscomm.SetCommPort(_ttoi(m_PortNum));
 		CString strPara;
@@ -436,14 +446,17 @@ void CSerialToolDlg::OnButtonOpensendfile()
 	{
 		CFileDialog fd(TRUE,"*.txt", NULL, OFN_HIDEREADONLY, szFilter);	
 		if(IDCANCEL == fd.DoModal())
-			return;
+			return ;
 		strPathName = fd.GetPathName();
 		
 		if(!m_fileSend.Open(strPathName, CFile::shareExclusive | CFile::modeRead))
 		{
 			AfxMessageBox("打开失败！");
+			return ;
 		}
 
+		m_fileSendcentiLength = m_fileSend.GetLength() / FSPROGRESSMAXRANGE;
+		m_ProgressSendFile.SetPos(0);
 		m_OpensendfileBut.SetWindowText("关闭发送文件");
 	}
 }
@@ -513,6 +526,12 @@ void CSerialToolDlg::OnButtonClearrecv()
 void CSerialToolDlg::OnClose() 
 {
 	// TODO: Add your message handler code here and/or call default
+	if (m_bTimerStart)
+	{
+		m_bTimerStart = FALSE;
+		WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
+		m_TimerThread = NULL;
+	}
 	if(m_mscomm.GetPortOpen())		//如果串口是打开的，则行关闭串口
     {
         m_mscomm.SetPortOpen(FALSE);
@@ -535,8 +554,26 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 	switch(nIDEvent)
 	{
         case 1:
+			if (m_fileSend.m_pStream)
+			{
+				int posProgress = m_fileSend.GetPosition() / m_fileSendcentiLength;
+				m_ProgressSendFile.SetPos( posProgress );
+				if (m_fileSend.GetLength() == m_fileSend.GetPosition())
+				{
+					OnButtonSettimer();
+					KillTimer(1);
+					m_fileSend.Close();
+					m_OpensendfileBut.SetWindowText("打开发送文件");
+				}
+			}
             break;
         case 2:
+			{
+				int RecvStrLen = m_RecvEdit.GetWindowTextLength();		
+				m_RecvEdit.SetSel(RecvStrLen, RecvStrLen, TRUE);
+				m_RecvEdit.ReplaceSel(m_RecvStrBuff);
+				m_RecvStrBuff.Empty();
+			}
             break;
         case 3:
             break;
@@ -555,6 +592,7 @@ void CSerialToolDlg::OnButtonSettimer()
 			m_TimerThread = AfxBeginThread((AFX_THREADPROC)timerThreadProc, this, THREAD_PRIORITY_HIGHEST);
 
 			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERFIN));
+			SetTimer(1, 1000, NULL);
 		}
 	}
 	else
@@ -565,6 +603,7 @@ void CSerialToolDlg::OnButtonSettimer()
 			m_TimerThread = NULL;
 
 			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
+			KillTimer(1);
 		}
 	}
 }

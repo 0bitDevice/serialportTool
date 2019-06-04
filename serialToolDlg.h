@@ -26,6 +26,7 @@ public:
 // Dialog Data
 	//{{AFX_DATA(CSerialToolDlg)
 	enum { IDD = IDD_SERIALTOOL_DIALOG };
+	CProgressCtrl	m_ProgressSendFile;
 	CButton	m_RecvSaveBut;
 	CButton	m_SetTimerBut;
 	CEdit	m_RecvEdit;
@@ -55,7 +56,9 @@ public:
 	//}}AFX_DATA
 
 	CStdioFile	m_fileSend;
+	DWORD		m_fileSendcentiLength;
 	CStdioFile	m_fileRecv;
+	CString		m_RecvStrBuff;
 	BOOL		m_bRecordRecv;
 	BOOL		m_bOpenComm;
 	BOOL		m_bTimerStart;

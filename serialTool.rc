@@ -68,7 +68,7 @@ END
 // remains consistent on all systems.
 IDR_MAINFRAME           ICON    DISCARDABLE     "res\\serialTool.ico"
 IDI_ICON_TIMERSTART     ICON    DISCARDABLE     "res\\icon1.ico"
-IDI_ICON_TIMERFIN       ICON    DISCARDABLE     "res\\ico00001.ico"
+IDI_ICON_TIMERFIN       ICON    DISCARDABLE     "res\\icon2.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -120,14 +120,16 @@ BEGIN
     GROUPBOX        "接收区",IDC_STATIC,95,7,218,136
     EDITTEXT        IDC_EDIT_SEND,104,170,201,13,ES_AUTOHSCROLL
     GROUPBOX        "发送区",IDC_STATIC,95,160,218,26
-    PUSHBUTTON      "发送",IDC_BUTTON_SEND,7,176,60,28
+    PUSHBUTTON      "发送",IDC_BUTTON_SEND,7,165,60,28
     CONTROL         "HEX显示发送",IDC_CHECK_HEXSEND,"Button",BS_AUTOCHECKBOX | 
                     WS_TABSTOP,95,192,60,10
     CONTROL         "HEX显示接收",IDC_CHECK_HEXRECV,"Button",BS_AUTOCHECKBOX | 
                     WS_TABSTOP,95,147,60,10
     PUSHBUTTON      "清空接收区",IDC_BUTTON_CLEARRECV,156,145,50,16
-    PUSHBUTTON      "定时",IDC_BUTTON_SETTIMER,68,176,26,28,BS_ICON
+    PUSHBUTTON      "定时",IDC_BUTTON_SETTIMER,67,165,26,28,BS_ICON
     PUSHBUTTON      "记录接收区",IDC_BUTTON_RECVSAVE,263,145,50,16
+    CONTROL         "Progress1",IDC_PROGRESS_SENDFILE,"msctls_progress32",
+                    WS_BORDER,7,196,85,8
 END
 
 
