@@ -12,7 +12,8 @@ static char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-#define COMCOUNT	16
+#define	COMCOUNT				16
+#define TIMEDEVIATION			10
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -200,20 +201,45 @@ int CSerialToolDlgFunc::ProcessingData(CStdioFile& file, CString& strData)
 			file.Seek(lActual, CFile::begin);
 		}
 	}
-	
 
+	if (0 == phraseCount)			//当前语句非法，跳过
+	{
+		file.ReadString(strLine);	
+	}
+	
 	return phraseCount;
 }
 
-int CSerialToolDlgFunc::RecordData(CStdioFile& file, CString& strData)
+int CSerialToolDlgFunc::RecordData(CStdioFile& file, CString& strData, BOOL bRecTime)
 {
-	SYSTEMTIME sysTime;
-	GetLocalTime(&sysTime);
-	CString strTime, strDataTimed;
-	strTime.Format("[%d:%d:%d.%d]", sysTime.wHour, sysTime.wMinute, sysTime.wSecond, sysTime.wMilliseconds);
+	SYSTEMTIME		sysTime;
+	CString			strTime, strDataTimed, strTimeErr;
 
-	strDataTimed = strTime + strData;
+	GetLocalTime(&sysTime);			//获取当前系统时间
+	
+	static WORD		preMilliseconds = sysTime.wMilliseconds;
+	int				passedTime = 0;
+
+	if (bRecTime)
+	{
+		strTime.Format("[%d:%d:%d.%d]\r\n", sysTime.wHour, sysTime.wMinute, sysTime.wSecond, sysTime.wMilliseconds);
+	}
+
+	passedTime = sysTime.wMilliseconds - preMilliseconds;
+	if (passedTime < 0)
+	{
+		passedTime = 1000 - preMilliseconds + sysTime.wMilliseconds;
+	}
+
+	if ( (passedTime < (100 - TIMEDEVIATION)) || (passedTime > (100 + TIMEDEVIATION)))
+	{
+		strTimeErr.Format("<%d>", passedTime);
+	}
+
+	strDataTimed = strTimeErr + strTime + strData;
 	file.Write(strDataTimed, strDataTimed.GetLength());
+	file.Flush();
 
+	preMilliseconds = sysTime.wMilliseconds;
 	return 0;
 }

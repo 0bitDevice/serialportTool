@@ -164,6 +164,10 @@ BOOL CSerialToolDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 	
 	// TODO: Add extra initialization here
+	CString title;						//区分不同进程
+	title.Format("serialTool-%d", this->m_hWnd);
+	SetWindowText(title);
+
 	m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
 	m_ProgressSendFile.SetRange(0, FSPROGRESSMAXRANGE);
 
@@ -636,7 +640,12 @@ DWORD WINAPI CSerialToolDlg::timerThreadProc(LPVOID pParam)
 	while (pSerialToolDlg->m_bTimerStart)
 	{
 		CString strData;
-		CSerialToolDlgFunc::ProcessingData(pSerialToolDlg->m_fileSend, strData);
+		int ret = 0, retCount = 0;
+		while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
+		{
+			ret = CSerialToolDlgFunc::ProcessingData(pSerialToolDlg->m_fileSend, strData);
+			++retCount;
+		}
 		pSerialToolDlg->m_mscomm.SetOutput(COleVariant(strData));
 
 		LARGE_INTEGER start, end;
@@ -669,6 +678,7 @@ void CSerialToolDlg::OnButtonRecvsave()
 	{
 		m_fileRecv.Close();
 		m_bRecordRecv = FALSE;
+		AfxMessageBox("保存成功！");
 		m_RecvSaveBut.SetWindowText("记录接收区");
 	}
 	else
