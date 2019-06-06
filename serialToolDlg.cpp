@@ -13,8 +13,11 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-#define EPSILON					0.000001
+#define EPSILON					0.00000001
 #define FSPROGRESSMAXRANGE		100
+
+#define COMMSENDDATACYCLE		10//ms
+
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
 
@@ -297,7 +300,7 @@ void CSerialToolDlg::OnCommMscomm()
 			BYTE bt=*(char*)(rxdata+k);
 			if (m_HexRecvChk)
 			{
-				strtemp.Format("%02x",bt);
+				strtemp.Format("%02x ",bt);
 			}
 			else
 			{
@@ -351,6 +354,8 @@ void CSerialToolDlg::OnButtonOpencom()
 		{	
 			m_fileSend.Close();
 			m_OpensendfileBut.SetWindowText("打开发送文件");
+			m_SendEdit.EnableWindow(TRUE);
+			m_SendEdit.SetWindowText(NULL);
 		}
 
 		if (m_fileRecv.m_pStream)
@@ -465,6 +470,8 @@ void CSerialToolDlg::OnButtonOpensendfile()
 	{	
 		m_fileSend.Close();
 		m_OpensendfileBut.SetWindowText("打开发送文件");
+		m_SendEdit.EnableWindow(TRUE);
+		m_SendEdit.SetWindowText(NULL);
 	}
 	else
 	{
@@ -479,6 +486,8 @@ void CSerialToolDlg::OnButtonOpensendfile()
 			return ;
 		}
 
+		m_SendEdit.SetWindowText(strPathName);
+		m_SendEdit.EnableWindow(FALSE);
 		m_fileSendcentiLength = m_fileSend.GetLength() / FSPROGRESSMAXRANGE;
 		m_ProgressSendFile.SetPos(0);
 		m_OpensendfileBut.SetWindowText("关闭发送文件");
@@ -588,6 +597,8 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 					KillTimer(1);
 					m_fileSend.Close();
 					m_OpensendfileBut.SetWindowText("打开发送文件");
+					m_SendEdit.EnableWindow(TRUE);
+					m_SendEdit.SetWindowText(NULL);
 				}
 			}
             break;
@@ -600,6 +611,16 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 			}
             break;
         case 3:
+			{
+				CString strData;
+				int ret = 0, retCount = 0;
+				while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
+				{
+					ret = CSerialToolDlgFunc::ProcessingData(m_fileSend, strData);
+					++retCount;
+				}
+				m_mscomm.SetOutput(COleVariant(strData));
+			}
             break;
     }
 	CDialog::OnTimer(nIDEvent);
@@ -617,6 +638,8 @@ void CSerialToolDlg::OnButtonSettimer()
 
 			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERFIN));
 			SetTimer(1, 1000, NULL);
+
+			SetTimer(3, COMMSENDDATACYCLE, NULL);
 		}
 	}
 	else
@@ -628,6 +651,8 @@ void CSerialToolDlg::OnButtonSettimer()
 
 			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
 			KillTimer(1);
+
+			KillTimer(3);
 		}
 	}
 }
@@ -639,24 +664,24 @@ DWORD WINAPI CSerialToolDlg::timerThreadProc(LPVOID pParam)
 		
 	while (pSerialToolDlg->m_bTimerStart)
 	{
-		CString strData;
-		int ret = 0, retCount = 0;
-		while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
-		{
-			ret = CSerialToolDlgFunc::ProcessingData(pSerialToolDlg->m_fileSend, strData);
-			++retCount;
-		}
-		pSerialToolDlg->m_mscomm.SetOutput(COleVariant(strData));
+//		CString strData;
+//		int ret = 0, retCount = 0;
+//		while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
+//		{
+//			ret = CSerialToolDlgFunc::ProcessingData(pSerialToolDlg->m_fileSend, strData);
+//			++retCount;
+//		}
+//		pSerialToolDlg->m_mscomm.SetOutput(COleVariant(strData));
 
 		LARGE_INTEGER start, end;
 		LARGE_INTEGER freq;
 		double passedTime = 0.0;
 		QueryPerformanceFrequency(&freq);  
-		QueryPerformanceCounter(&start);//start  
-		//running 100 milliseconds
-		while ((pSerialToolDlg->m_bTimerStart) && ((passedTime < 100) && (fabs(passedTime - 100.0) >= EPSILON)))
+		QueryPerformanceCounter(&start);  
+
+		while ((pSerialToolDlg->m_bTimerStart) && ((passedTime < COMMSENDDATACYCLE) && (fabs(passedTime - COMMSENDDATACYCLE) >= EPSILON)))
 		{
-			QueryPerformanceCounter(&end); //end
+			QueryPerformanceCounter(&end);
 
 			passedTime = 1000 * (end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
 		}

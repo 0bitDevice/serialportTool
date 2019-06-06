@@ -13,7 +13,10 @@ static char THIS_FILE[]=__FILE__;
 #endif
 
 #define	COMCOUNT				16
-#define TIMEDEVIATION			10
+
+#define TIMEDEVIATION			10//ms
+#define RECVDATACYCLE			100//ms
+
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -215,31 +218,33 @@ int CSerialToolDlgFunc::RecordData(CStdioFile& file, CString& strData, BOOL bRec
 	SYSTEMTIME		sysTime;
 	CString			strTime, strDataTimed, strTimeErr;
 
-	GetLocalTime(&sysTime);			//获取当前系统时间
-	
-	static WORD		preMilliseconds = sysTime.wMilliseconds;
-	int				passedTime = 0;
-
 	if (bRecTime)
 	{
-		strTime.Format("[%d:%d:%d.%d]\r\n", sysTime.wHour, sysTime.wMinute, sysTime.wSecond, sysTime.wMilliseconds);
-	}
+		GetLocalTime(&sysTime);			//获取当前系统时间
 
-	passedTime = sysTime.wMilliseconds - preMilliseconds;
-	if (passedTime < 0)
-	{
-		passedTime = 1000 - preMilliseconds + sysTime.wMilliseconds;
-	}
+		static WORD		preMilliseconds = sysTime.wMilliseconds;
+		int				passedTime = 0;
 
-	if ( (passedTime < (100 - TIMEDEVIATION)) || (passedTime > (100 + TIMEDEVIATION)))
-	{
-		strTimeErr.Format("<%d>", passedTime);
+		strTime.Format("//[%d:%d:%d.%d]\r\n", sysTime.wHour, sysTime.wMinute, sysTime.wSecond, sysTime.wMilliseconds);
+
+		passedTime = sysTime.wMilliseconds - preMilliseconds;
+
+		if (passedTime < 0)
+		{
+			passedTime = 1000 - preMilliseconds + sysTime.wMilliseconds;
+		}
+
+		if ( (passedTime < (RECVDATACYCLE - TIMEDEVIATION)) || (passedTime > (RECVDATACYCLE + TIMEDEVIATION)))
+		{
+			strTimeErr.Format("//<%d>\r\n", passedTime);
+		}
+		
+		preMilliseconds = sysTime.wMilliseconds;
 	}
 
 	strDataTimed = strTimeErr + strTime + strData;
 	file.Write(strDataTimed, strDataTimed.GetLength());
 	file.Flush();
 
-	preMilliseconds = sysTime.wMilliseconds;
 	return 0;
 }

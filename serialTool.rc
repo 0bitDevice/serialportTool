@@ -120,14 +120,14 @@ BEGIN
     GROUPBOX        "接收区",IDC_STATIC,95,7,218,136
     EDITTEXT        IDC_EDIT_SEND,104,170,201,13,ES_AUTOHSCROLL
     GROUPBOX        "发送区",IDC_STATIC,95,160,218,26
-    PUSHBUTTON      "发送",IDC_BUTTON_SEND,7,165,60,28
-    CONTROL         "HEX显示发送",IDC_CHECK_HEXSEND,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,95,192,60,10
-    CONTROL         "HEX显示接收",IDC_CHECK_HEXRECV,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,95,147,60,10
-    PUSHBUTTON      "清空接收区",IDC_BUTTON_CLEARRECV,156,145,50,16
+    PUSHBUTTON      "发送",IDC_BUTTON_SEND,7,165,54,28
+    CONTROL         "发送HEX格式数据",IDC_CHECK_HEXSEND,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,95,192,76,10
+    CONTROL         "接收转成HEX格式",IDC_CHECK_HEXRECV,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,95,147,76,10
+    PUSHBUTTON      "清空接收区",IDC_BUTTON_CLEARRECV,177,144,50,16
     PUSHBUTTON      "定时",IDC_BUTTON_SETTIMER,67,165,26,28,BS_ICON
-    PUSHBUTTON      "记录接收区",IDC_BUTTON_RECVSAVE,263,145,50,16
+    PUSHBUTTON      "记录接收区",IDC_BUTTON_RECVSAVE,263,144,50,16
     CONTROL         "Progress1",IDC_PROGRESS_SENDFILE,"msctls_progress32",
                     WS_BORDER,7,196,85,8
 END
@@ -154,8 +154,9 @@ VS_VERSION_INFO VERSIONINFO
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
-        BLOCK "080404B0"
+        BLOCK "080404b0"
         BEGIN
+            VALUE "Comments", "\0"
             VALUE "CompanyName", "\0"
             VALUE "FileDescription", "serialTool Microsoft 基础类应用程序\0"
             VALUE "FileVersion", "1, 0, 0, 1\0"
@@ -163,8 +164,10 @@ BEGIN
             VALUE "LegalCopyright", "版权所有 (C) 2019\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "serialTool.EXE\0"
+            VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "serialTool 应用程序\0"
             VALUE "ProductVersion", "1, 0, 0, 1\0"
+            VALUE "SpecialBuild", "\0"
         END
     END
     BLOCK "VarFileInfo"
