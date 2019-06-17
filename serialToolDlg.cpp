@@ -16,7 +16,9 @@ static char THIS_FILE[] = __FILE__;
 #define EPSILON					0.00000001
 #define FSPROGRESSMAXRANGE		100
 
-#define COMMSENDDATACYCLE		10//ms
+#define COMMSENDDATACYCLE		100//ms
+#define SENDCYCLEMAXNUM			3
+#define DISPLAYMAXLENGTH		50
 
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
@@ -72,12 +74,14 @@ CSerialToolDlg::CSerialToolDlg(CWnd* pParent /*=NULL*/)
 	//{{AFX_DATA_INIT(CSerialToolDlg)
 	m_SendStr = _T("");
 	m_RecvStr = _T("");
+	m_pFileText = NULL;
+	m_pFileCurrentIndex = NULL;
 	m_HexSendChk = FALSE;
 	m_HexRecvChk = FALSE;
 	m_bOpenComm = FALSE;
 	m_bTimerStart = FALSE;
-	m_TimerThread = NULL;
 	m_bRecordRecv = FALSE;
+	m_RecvTimestampChk = FALSE;
 	//}}AFX_DATA_INIT
 	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -87,6 +91,8 @@ void CSerialToolDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CSerialToolDlg)
+	DDX_Control(pDX, IDC_CHECK_RECVTIMESTAMP, m_RecvTimestampChkBut);
+	DDX_Control(pDX, IDC_EDIT_SENDCYCLE, m_SendCycleEdit);
 	DDX_Control(pDX, IDC_PROGRESS_SENDFILE, m_ProgressSendFile);
 	DDX_Control(pDX, IDC_BUTTON_RECVSAVE, m_RecvSaveBut);
 	DDX_Control(pDX, IDC_BUTTON_SETTIMER, m_SetTimerBut);
@@ -108,6 +114,7 @@ void CSerialToolDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_EDIT_RECV, m_RecvStr);
 	DDX_Check(pDX, IDC_CHECK_HEXSEND, m_HexSendChk);
 	DDX_Check(pDX, IDC_CHECK_HEXRECV, m_HexRecvChk);
+	DDX_Check(pDX, IDC_CHECK_RECVTIMESTAMP, m_RecvTimestampChk);
 	//}}AFX_DATA_MAP
 }
 
@@ -133,6 +140,7 @@ BEGIN_MESSAGE_MAP(CSerialToolDlg, CDialog)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BUTTON_SETTIMER, OnButtonSettimer)
 	ON_BN_CLICKED(IDC_BUTTON_RECVSAVE, OnButtonRecvsave)
+	ON_BN_CLICKED(IDC_CHECK_RECVTIMESTAMP, OnCheckRecvtimestamp)
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
@@ -214,6 +222,13 @@ BOOL CSerialToolDlg::OnInitDialog()
 	m_SendBut.EnableWindow(FALSE);
 	m_OpensendfileBut.EnableWindow(FALSE);
 
+	m_SendCycleEdit.SetWindowText("100");
+	m_SendCycleEdit.SetLimitText(SENDCYCLEMAXNUM);
+
+	//提示气泡
+	m_tooltip.Create(this);
+	m_tooltip.AddTool(GetDlgItem(IDC_EDIT_SENDCYCLE), "1~999");
+	m_tooltip.Activate(TRUE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -279,7 +294,7 @@ void CSerialToolDlg::OnCommMscomm()
 	VARIANT variant_inp;
 	COleSafeArray safearray_inp;
 	LONG len;
-	BYTE rxdata[2048];								//设置BYTE数组 An 8-bit integerthat is not signed.
+	BYTE rxdata[4096];								//设置BYTE数组 An 8-bit integerthat is not signed.
 	CString strtemp, strPack;
 
 	if(m_mscomm.GetCommEvent()==2)					//事件值为2表示接收缓冲区内有字符
@@ -314,7 +329,7 @@ void CSerialToolDlg::OnCommMscomm()
 
 		if (m_bRecordRecv)
 		{
-			CSerialToolDlgFunc::RecordData(m_fileRecv, strPack);
+			CSerialToolDlgFunc::RecordData(m_fileRecv, strPack, m_RecvTimestampChk);
 		}
 		
 	}
@@ -340,14 +355,8 @@ void CSerialToolDlg::OnButtonOpencom()
 		m_bOpenComm = FALSE;
 		m_bTimerStart = FALSE;
 
-		if (m_TimerThread != NULL)
-		{
-			WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
-			m_TimerThread = NULL;
-
-			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
-			KillTimer(1);
-		}
+		m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
+		KillTimer(1);
 
 		m_ProgressSendFile.SetPos(0);
 		if (m_fileSend.m_pStream)
@@ -367,6 +376,7 @@ void CSerialToolDlg::OnButtonOpencom()
     }
 	else
 	{
+		OnSelchangeComboPort();
 		SetTimer(2, 200, NULL);		//打开接收区显示刷新的定时器
 		m_PortNum.Delete(0, 3);
 		m_mscomm.SetCommPort(_ttoi(m_PortNum));
@@ -379,9 +389,9 @@ void CSerialToolDlg::OnButtonOpencom()
 		strPara+=",";
 		strPara+=m_StopBit;
 		m_mscomm.SetSettings(strPara);
-		m_mscomm.SetInBufferSize(1024);			//接收缓冲区
+		m_mscomm.SetInBufferSize(4096);			//接收缓冲区
 		m_mscomm.SetInBufferCount(0);
-		m_mscomm.SetOutBufferSize(1024);		//发送缓冲区
+		m_mscomm.SetOutBufferSize(2048);		//发送缓冲区
 		m_mscomm.SetInputLen(0);				//设置当前接收区数据长度为0,表示全部读取
 		m_mscomm.SetInputMode(1);				//以二进制方式读写数据   0是字符, 1是二进制
 		m_mscomm.SetRThreshold(1);				//接收缓冲区有1个及1个以上字符时，将引发接收数据的  OnComm
@@ -468,10 +478,13 @@ void CSerialToolDlg::OnButtonOpensendfile()
 	
 	if (m_fileSend.m_pStream)
 	{	
+		OnButtonSettimer();
 		m_fileSend.Close();
 		m_OpensendfileBut.SetWindowText("打开发送文件");
 		m_SendEdit.EnableWindow(TRUE);
 		m_SendEdit.SetWindowText(NULL);
+		delete m_pFileText;
+		m_pFileText = NULL;
 	}
 	else
 	{
@@ -485,12 +498,41 @@ void CSerialToolDlg::OnButtonOpensendfile()
 			AfxMessageBox("打开失败！");
 			return ;
 		}
+		
+		//缩短过长文件路径
+		if (strPathName.GetLength() > DISPLAYMAXLENGTH)
+		{
+			strPathName = strPathName.Left(20) + "..." + strPathName.Right(20);
+		}
 
 		m_SendEdit.SetWindowText(strPathName);
 		m_SendEdit.EnableWindow(FALSE);
-		m_fileSendcentiLength = m_fileSend.GetLength() / FSPROGRESSMAXRANGE;
+
+		
 		m_ProgressSendFile.SetPos(0);
 		m_OpensendfileBut.SetWindowText("关闭发送文件");
+
+		m_pFileText = new TCHAR[m_fileSend.GetLength()];
+		DWORD fileLen = m_fileSend.GetLength();
+		m_readSendFileLength = m_fileSend.Read(m_pFileText, m_fileSend.GetLength());	//!!!CStdioFile的Read函数会去掉'\r'!!!
+		m_pFileCurrentIndex = m_pFileText;
+		m_pFileText[m_readSendFileLength] = '\0';		//在有效的字符串后补个结尾
+
+		m_fileSendcentiLength = m_readSendFileLength / FSPROGRESSMAXRANGE;
+		if (0 == m_fileSendcentiLength)
+		{
+			m_fileSendcentiLength = 1;
+		}
+		
+		{	//打开完文件后，立刻读取一包数据，准备好发送状态
+			m_SendPackStr.Empty();
+			int ret = 0, retCount = 0;
+			while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
+			{
+				ret = CSerialToolDlgFunc::ProcessingData(m_pFileCurrentIndex, m_SendPackStr);
+				++retCount;
+			}
+		}
 	}
 }
 
@@ -498,6 +540,12 @@ BOOL CSerialToolDlg::PreTranslateMessage(MSG* pMsg)
 {
     if(pMsg->message==WM_KEYDOWN&&pMsg->wParam==VK_RETURN)    
         return TRUE; 
+	if (pMsg->message == WM_MOUSEMOVE || pMsg->message == WM_LBUTTONDOWN || 
+        pMsg->message == WM_LBUTTONUP)
+	{
+		m_tooltip.RelayEvent(pMsg);
+	}
+
 
     return CDialog::PreTranslateMessage(pMsg);
 }
@@ -562,10 +610,8 @@ void CSerialToolDlg::OnClose()
 	if (m_bTimerStart)
 	{
 		m_bTimerStart = FALSE;
-		WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
-		m_TimerThread = NULL;
 	}
-	if(m_mscomm.GetPortOpen())		//如果串口是打开的，则行关闭串口
+	if(m_mscomm.GetPortOpen())				//如果串口是打开的，则行关闭串口
     {
         m_mscomm.SetPortOpen(FALSE);
     }
@@ -577,6 +623,11 @@ void CSerialToolDlg::OnClose()
 	{
 		m_fileRecv.Close();
 	}
+	if (m_pFileText != NULL)
+	{
+		delete m_pFileText;
+		m_pFileText = NULL;
+	}
 
 	CDialog::OnClose();
 }
@@ -586,12 +637,16 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 	// TODO: Add your message handler code here and/or call default
 	switch(nIDEvent)
 	{
-        case 1:
+        case 1:			//UI更新
 			if (m_fileSend.m_pStream)
 			{
-				int posProgress = m_fileSend.GetPosition() / m_fileSendcentiLength;
+				unsigned int posProgress = (m_pFileCurrentIndex - m_pFileText) / m_fileSendcentiLength;
+				if (posProgress == m_readSendFileLength)
+				{
+					posProgress = 100;
+				}
 				m_ProgressSendFile.SetPos( posProgress );
-				if (m_fileSend.GetLength() == m_fileSend.GetPosition())
+				if ((m_pFileCurrentIndex - m_pFileText) == (int)m_readSendFileLength)
 				{
 					OnButtonSettimer();
 					KillTimer(1);
@@ -602,7 +657,7 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 				}
 			}
             break;
-        case 2:
+        case 2:			//接收区显示刷新的定时器
 			{
 				int RecvStrLen = m_RecvEdit.GetWindowTextLength();		
 				m_RecvEdit.SetSel(RecvStrLen, RecvStrLen, TRUE);
@@ -610,16 +665,17 @@ void CSerialToolDlg::OnTimer(UINT nIDEvent)
 				m_RecvStrBuff.Empty();
 			}
             break;
-        case 3:
+        case 3:			//数据包发送
 			{
-				CString strData;
+				m_mscomm.SetOutput(COleVariant(m_SendPackStr));		//数据包先发送确保时间，之后再读取数据以降低延迟
+
+				m_SendPackStr.Empty();
 				int ret = 0, retCount = 0;
 				while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
 				{
-					ret = CSerialToolDlgFunc::ProcessingData(m_fileSend, strData);
+					ret = CSerialToolDlgFunc::ProcessingData(m_pFileCurrentIndex, m_SendPackStr);
 					++retCount;
 				}
-				m_mscomm.SetOutput(COleVariant(strData));
 			}
             break;
     }
@@ -634,62 +690,29 @@ void CSerialToolDlg::OnButtonSettimer()
 	{
 		if (m_fileSend.m_pStream && m_bOpenComm)
 		{
-			m_TimerThread = AfxBeginThread((AFX_THREADPROC)timerThreadProc, this, THREAD_PRIORITY_HIGHEST);
-
 			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERFIN));
 			SetTimer(1, 1000, NULL);
 
-			SetTimer(3, COMMSENDDATACYCLE, NULL);
+			CString strNum;
+			m_SendCycleEdit.GetWindowText(strNum);
+			int sendCycle = _ttoi(strNum);
+			if (0 == sendCycle)
+			{
+				sendCycle = 1;
+			}
+			
+			SetTimer(3, sendCycle, NULL);
+			m_SendCycleEdit.EnableWindow(FALSE);
 		}
 	}
 	else
 	{
-		if (m_TimerThread != NULL)
-		{
-			WaitForSingleObject(m_ThreadStopEvnt, INFINITE);
-			m_TimerThread = NULL;
-
 			m_SetTimerBut.SetIcon(AfxGetApp()->LoadIcon(IDI_ICON_TIMERSTART));
 			KillTimer(1);
 
 			KillTimer(3);
-		}
+			m_SendCycleEdit.EnableWindow(TRUE);
 	}
-}
-
-DWORD WINAPI CSerialToolDlg::timerThreadProc(LPVOID pParam)
-{
-	CSerialToolDlg* pSerialToolDlg = (CSerialToolDlg*)pParam;
-	SetThreadAffinityMask(GetCurrentThread(), 1);  
-		
-	while (pSerialToolDlg->m_bTimerStart)
-	{
-//		CString strData;
-//		int ret = 0, retCount = 0;
-//		while (0 == ret && retCount < 3)		//跳过3行非法字符串，!!!具体行数再论!!!
-//		{
-//			ret = CSerialToolDlgFunc::ProcessingData(pSerialToolDlg->m_fileSend, strData);
-//			++retCount;
-//		}
-//		pSerialToolDlg->m_mscomm.SetOutput(COleVariant(strData));
-
-		LARGE_INTEGER start, end;
-		LARGE_INTEGER freq;
-		double passedTime = 0.0;
-		QueryPerformanceFrequency(&freq);  
-		QueryPerformanceCounter(&start);  
-
-		while ((pSerialToolDlg->m_bTimerStart) && ((passedTime < COMMSENDDATACYCLE) && (fabs(passedTime - COMMSENDDATACYCLE) >= EPSILON)))
-		{
-			QueryPerformanceCounter(&end);
-
-			passedTime = 1000 * (end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
-		}
-	}
-
-	pSerialToolDlg->m_ThreadStopEvnt.SetEvent();
-
-	return 0;
 }
 
 void CSerialToolDlg::OnButtonRecvsave() 
@@ -724,4 +747,16 @@ void CSerialToolDlg::OnButtonRecvsave()
 			m_RecvSaveBut.SetWindowText("记录中……");
 		}
 	}
+}
+
+
+void CSerialToolDlg::OnCheckRecvtimestamp() 
+{
+	// TODO: Add your control notification handler code here
+	BOOL bFLag = m_RecvTimestampChkBut.GetCheck();
+	if(bFLag)
+	{}
+
+	m_RecvTimestampChkBut.SetCheck(bFLag);
+	m_RecvTimestampChk = bFLag;	
 }
